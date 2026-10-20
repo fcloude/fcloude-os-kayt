@@ -1,9 +1,12 @@
 """Session-only file grants, the capability layer from the threat model.
 
 A grant is created from a path the *user* chose. Nothing else — never a model —
-supplies a path here (threat model T3). Symlinks are rejected and the file is
-opened exactly once, with the regular-file check performed on the open handle
-itself, so the check and the read cannot disagree (threat model T4).
+supplies a path here (threat model T3). Symlinks are rejected up front and the
+file is opened with ``O_NOFOLLOW`` (where the platform has it) so the final path
+component cannot be swapped for a link. ``O_NONBLOCK`` (also where available)
+keeps a named pipe from hanging the open. The regular-file check is then
+performed on the open handle itself, and the read is capped at one byte past
+the limit, so the check and the read cannot disagree (threat model T4).
 """
 
 import os
@@ -27,6 +30,19 @@ class Grant:
     size: int
 
 
+def _read_upto(fd: int, limit: int) -> bytes:
+    """Read at most ``limit`` bytes from an open file description."""
+    chunks: list[bytes] = []
+    remaining = limit
+    while remaining > 0:
+        chunk = os.read(fd, remaining)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
 class GrantStore:
     """Grants valid for this session only: alive until ``clear()`` is called."""
 
@@ -48,17 +64,28 @@ class GrantStore:
             raise GrantError(f"unsupported file type: {path} (use .txt or .md)")
 
         resolved = candidate.resolve()
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_BINARY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+        )
         try:
-            with open(resolved, "rb") as handle:
-                info = os.fstat(handle.fileno())
+            fd = os.open(resolved, flags)
+            try:
+                info = os.fstat(fd)
                 if not stat.S_ISREG(info.st_mode):
                     raise GrantError(f"not a regular file after open: {path}")
                 if info.st_size > MAX_BYTES:
                     raise GrantError(f"file too large: {path} (limit is 100 KB)")
-                data = handle.read()
+                data = _read_upto(fd, MAX_BYTES + 1)
+            finally:
+                os.close(fd)
         except OSError:
             raise GrantError(f"cannot read file: {path}") from None
 
+        if len(data) > MAX_BYTES:
+            raise GrantError(f"file too large: {path} (limit is 100 KB)")
         try:
             content = data.decode("utf-8")
         except UnicodeDecodeError:
@@ -66,7 +93,9 @@ class GrantStore:
         if not content:
             raise GrantError(f"file is empty: {path}")
 
-        grant = Grant(id=f"grant_{self._next_id}", path=resolved, size=info.st_size)
+        grant = Grant(
+            id=f"grant_{self._next_id}", path=resolved, size=info.st_size
+        )
         self._next_id += 1
         self._grants[grant.id] = grant
         self._contents[grant.id] = content
