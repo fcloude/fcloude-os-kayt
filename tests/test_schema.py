@@ -57,6 +57,18 @@ def test_path_in_grant_id_rejected():
         parse_action(raw)
 
 
+def test_trailing_newline_in_grant_id_rejected():
+    raw = '{"tool": "summarize_text", "grant_id": "grant_1\\n"}'
+    with pytest.raises(SchemaError, match="invalid grant reference"):
+        parse_action(raw)
+
+
+def test_tool_comparison_is_case_sensitive():
+    raw = '{"tool": "Summarize_Text", "grant_id": "grant_1"}'
+    with pytest.raises(SchemaError, match="unknown tool"):
+        parse_action(raw)
+
+
 def test_oversized_input_rejected_before_parsing():
     raw = VALID + " " * (schema.MAX_RAW_BYTES + 1)
     with pytest.raises(SchemaError, match="too large"):
