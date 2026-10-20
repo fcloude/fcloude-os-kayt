@@ -118,8 +118,9 @@ decoding before reading, and prints one line and exits non-zero on any failure.
 The longer-term answer is stronger than any check: the model will never name a
 path at all — it will only be able to reference an internal grant created from
 the user's own pick, so traversal has no handle to grab.
-Status: partially enforced today (the five input checks in `inputs.py`); grants
-planned for Goal 3.
+Status: enforced — the CLI reads `--file` only through `GrantStore.create()`,
+which applies the five checks (they now live in `grants.py`; `inputs.py` keeps
+only the shared constants and `check_question`).
 
 ### T4 — Symlinks and time-of-check/time-of-use
 
@@ -131,9 +132,11 @@ Boundary: filesystem state into the trusted check. Response: reject non-regular
 files, resolve links and remember the resolved path, and — for the strongest
 form — open the file once and read from that same open handle so the check and
 the read cannot disagree.
-Status: not enforced. `is_file()` currently follows symlinks, so a `.txt` link
-to an allowed regular file passes. Recorded here as a known gap to close with
-the grants implementation.
+Status: enforced in grants — early `is_symlink()` rejection, `O_NOFOLLOW` and
+`O_NONBLOCK` where the platform has them, regular-file check on the open handle,
+and a read capped at one byte past the limit. Verified on Windows 11 /
+Python 3.13 on 2026-10-20; see `docs/decisions.md` for the remaining limits
+(final component only, flags inert on Windows, junctions rejected accidentally).
 
 ### T5 — Accidental logging of file contents
 

@@ -3,7 +3,8 @@
 import argparse
 import sys
 
-from kayt.inputs import InputError, check_question, read_file
+from kayt.grants import GrantStore
+from kayt.inputs import InputError, check_question
 from kayt.providers.mock import MockProvider
 
 
@@ -26,7 +27,10 @@ def main(argv: list[str] | None = None) -> None:
 
     try:
         question = check_question(args.question)
-        source = read_file(args.file) if args.file else question
+        if args.file:
+            _, source = GrantStore().create(args.file)
+        else:
+            source = question
     except InputError as exc:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(1) from None

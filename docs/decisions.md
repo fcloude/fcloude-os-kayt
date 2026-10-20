@@ -19,3 +19,7 @@ multi-agent, custom kernel/updater/package manager.
 - Size limit: 100 KB = 102,400 bytes.
 - Permission-denied branch exists but is not tested on Windows.
 - Question is required even when --file is given (product decision, deferred).
+- Symlink defence verified 2026-10-20 on Windows 11, Python 3.13 (passed, not skipped); re-verify on Linux/WSL in Goal 6.
+- O_NOFOLLOW constrains only the final path component; parent symlinks rely on resolve().
+- O_NOFOLLOW and O_NONBLOCK are inert on Windows, so the early is_symlink() check is the only guard there.
+- Junctions are rejected only by the "not a regular file" branch (accidental, not designed).

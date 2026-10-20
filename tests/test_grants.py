@@ -22,6 +22,13 @@ def test_create_returns_grant_and_content(tmp_path):
     assert content == "hello world"
 
 
+def test_create_accepts_md_file(tmp_path):
+    path = tmp_path / "notes.md"
+    path.write_text("# title", encoding="utf-8")
+    _, content = GrantStore().create(path)
+    assert content == "# title"
+
+
 def test_grant_records_resolved_path_and_size(tmp_path):
     path = make_notes(tmp_path, "hello world")
     grant, _ = GrantStore().create(path)
@@ -53,6 +60,14 @@ def test_oversized_file_rejected(tmp_path):
         GrantStore().create(path)
 
 
+def test_file_at_size_limit_accepted(tmp_path):
+    path = tmp_path / "exactly.txt"
+    path.write_bytes(b"a" * LIMIT)
+    grant, content = GrantStore().create(path)
+    assert grant.size == LIMIT
+    assert content == "a" * LIMIT
+
+
 def test_file_growing_past_limit_is_rejected(tmp_path, monkeypatch):
     path = tmp_path / "grow.txt"
     path.write_bytes(b"a" * (10 * 1024))  # fine at validation time
@@ -69,6 +84,20 @@ def test_file_growing_past_limit_is_rejected(tmp_path, monkeypatch):
     monkeypatch.setattr(grants.os, "read", growing_read)
     with pytest.raises(GrantError, match="too large"):
         GrantStore().create(path)
+
+
+def test_unexpected_error_fails_closed_and_stores_no_grant(tmp_path, monkeypatch):
+    path = make_notes(tmp_path)
+    store = GrantStore()
+
+    def exploding_read(fd, n):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(grants.os, "read", exploding_read)
+    with pytest.raises(GrantError, match="cannot read file"):
+        store.create(path)
+    with pytest.raises(GrantError, match="unknown grant"):
+        store.lookup("grant_1")
 
 
 def test_non_utf8_file_rejected(tmp_path):
@@ -125,9 +154,17 @@ def test_ids_are_not_reused_after_clear(tmp_path):
     assert grant.id == "grant_2"
 
 
-def test_content_is_snapshotted_at_grant_time(tmp_path):
+def test_read_after_file_deleted_returns_stored_content(tmp_path):
     path = make_notes(tmp_path, "original")
     store = GrantStore()
     grant, _ = store.create(path)
-    path.write_text("swapped out", encoding="utf-8")
+    path.unlink()
+    assert store.read(grant.id) == "original"  # snapshot, not a re-read
+
+
+def test_read_after_file_replaced_returns_stored_content(tmp_path):
+    path = make_notes(tmp_path, "original")
+    store = GrantStore()
+    grant, _ = store.create(path)
+    path.write_text("replaced content", encoding="utf-8")
     assert store.read(grant.id) == "original"
