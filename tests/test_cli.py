@@ -10,10 +10,12 @@ def test_typed_question_reports_typed_text(capsys):
     ]
 
 
-def test_file_option_reports_filename(capsys):
-    cli.main(["summarise this", "--file", "notes.txt"])
+def test_file_option_reports_filename(tmp_path, capsys):
+    path = tmp_path / "notes.txt"
+    path.write_text("some notes", encoding="utf-8")
+    cli.main(["summarise this", "--file", str(path)])
     assert capsys.readouterr().out.splitlines() == [
-        "Input: file notes.txt",
+        f"Input: file {path}",
         "Provider: mock",
         "mock response",
     ]

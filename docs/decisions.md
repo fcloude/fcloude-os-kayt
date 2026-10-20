@@ -12,3 +12,10 @@
 ## Deferred (do not build in MVP)
 Shell execution, root/admin access, arbitrary file search, voice, telemetry,
 multi-agent, custom kernel/updater/package manager.
+
+## Known gaps (from Milestone 2.4)
+- Symlinks are followed by is_file(). Fix in Milestone 3.2 (grants): resolve once, read from the opened handle.
+- Whitespace-only files are accepted as non-empty. Revisit later.
+- Size limit: 100 KB = 102,400 bytes.
+- Permission-denied branch exists but is not tested on Windows.
+- Question is required even when --file is given (product decision, deferred).
