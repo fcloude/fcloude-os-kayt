@@ -94,8 +94,12 @@ def test_unexpected_error_fails_closed_and_stores_no_grant(tmp_path, monkeypatch
         raise RuntimeError("boom")
 
     monkeypatch.setattr(grants.os, "read", exploding_read)
-    with pytest.raises(GrantError, match="cannot read file"):
+    with pytest.raises(GrantError) as err:
         store.create(path)
+    message = str(err.value)
+    assert message.startswith("cannot read file")
+    assert message.count("\n") == 0  # one line
+    assert "RuntimeError" not in message and "boom" not in message
     with pytest.raises(GrantError, match="unknown grant"):
         store.lookup("grant_1")
 

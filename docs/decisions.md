@@ -23,3 +23,4 @@ multi-agent, custom kernel/updater/package manager.
 - O_NOFOLLOW constrains only the final path component; parent symlinks rely on resolve().
 - O_NOFOLLOW and O_NONBLOCK are inert on Windows, so the early is_symlink() check is the only guard there.
 - Junctions are rejected only by the "not a regular file" branch (accidental, not designed).
+- Session equals process: the CLI builds a throwaway GrantStore per invocation, so grants die with the process; revisit when a session spans several turns.

@@ -102,10 +102,8 @@ class GrantStore:
             raise
         except OSError:
             raise GrantError(f"cannot read file: {path}") from None
-        except Exception as exc:
-            raise GrantError(
-                f"cannot read file: {path} ({type(exc).__name__})"
-            ) from None
+        except Exception:
+            raise GrantError(f"cannot read file: {path}") from None
 
         grant = Grant(
             id=f"grant_{self._next_id}", path=resolved, size=info.st_size
