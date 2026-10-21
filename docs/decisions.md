@@ -25,3 +25,5 @@ multi-agent, custom kernel/updater/package manager.
 - Junctions are rejected only by the "not a regular file" branch (accidental, not designed).
 - Session equals process: the CLI builds a throwaway GrantStore per invocation, so grants die with the process; revisit when a session spans several turns.
 - Grant expiry: grants are session-only and expire when clear() ends the session; there are no timestamps or TTLs, and a cleared id is never reused.
+- Audit log: JSON Lines, one line per event, metadata only -- timestamp, event, allowed, outcome, tool, grant_id -- with every field capped at 100 characters; the path is caller-chosen, never inside the source tree.
+- Audit writes are best-effort: a failed write is counted in AuditLog.failures and never raised to the caller; clear() deletes the file, and *.jsonl plus audit/ are gitignored.
