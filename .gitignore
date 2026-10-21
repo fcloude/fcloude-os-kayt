@@ -7,3 +7,5 @@ __pycache__/
 *.vdi
 .pytest_cache/
 .freebuff/
+*.jsonl
+audit/

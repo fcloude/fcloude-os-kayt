@@ -129,6 +129,16 @@ def test_output_never_carries_more_than_200_characters(tmp_path):
     assert "TAILMUSTNOTAPPEAR" not in result.output
 
 
+def test_gateway_caps_output_for_every_tool(tmp_path, monkeypatch):
+    store, grant = make_store(tmp_path)
+    monkeypatch.setitem(tools.TOOLS, "summarize_text", lambda s, g: "b" * 5000)
+    result = execute(allowed_action(grant), store)
+    assert result.ok is True
+    assert tools.MAX_OUTPUT_CHARS == 2000
+    assert result.output == "b" * 2000
+    assert len(result.output) == tools.MAX_OUTPUT_CHARS
+
+
 def test_short_content_is_summarised_whole(tmp_path):
     store, grant = make_store(tmp_path, "short")
     assert execute(allowed_action(grant), store).output == "Summary: short"

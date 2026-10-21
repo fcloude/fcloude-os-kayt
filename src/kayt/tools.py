@@ -4,8 +4,8 @@ Every capability KAYT has is a hand-written function in one small dict. The
 gateway trusts nobody: it asks the policy engine itself, even when the caller
 claims to have asked already, and it refuses anything the registry does not
 hold. There is no dynamic dispatch, no shell, and no filesystem access here --
-content comes only from a live grant, and only the first ``SUMMARY_CHARS``
-characters ever leave.
+content comes only from a live grant, and nothing longer than
+``MAX_OUTPUT_CHARS`` ever leaves, whatever a future tool tries to return.
 
 Failure is a value, not an exception: every path returns a ``ToolResult`` with
 a fixed-string error that never echoes file content or exception text.
@@ -17,6 +17,7 @@ from kayt import policy
 
 SUMMARY_CHARS = 200
 SUMMARY_PREFIX = "Summary: "
+MAX_OUTPUT_CHARS = 2000  # gateway cap: applies to every tool, present or future
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,7 @@ def execute(action: object, store: object) -> ToolResult:
         output = function(store, action.grant_id)
         if not isinstance(output, str):
             return ToolResult(False, "", "failed: the tool returned no text")
-        return ToolResult(True, output, "")
+        # The cap lives here, not in each tool, so no future tool can skip it.
+        return ToolResult(True, output[:MAX_OUTPUT_CHARS], "")
     except Exception:
         return ToolResult(False, "", "failed: the tool could not run")
