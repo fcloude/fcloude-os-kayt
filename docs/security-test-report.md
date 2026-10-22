@@ -1,18 +1,20 @@
 # KAYT security test report
 
-Status: adversarial test suite, first pass. Run 2026-10-21 on Windows 11
-(10.0.26300), Python 3.13.14, standard library only.
+Status: adversarial test suite plus the shipped loop. Run 2026-10-22 on
+Windows 11 (10.0.26300), Python 3.13.14, standard library only.
 
 ## What was run
 
 ```
 pytest -q -rs
-110 passed, 0 skipped
+133 passed, 0 skipped
 ```
 
 `tests/test_adversarial.py` contributes **19 test cases**: 13 named attacks,
 one of which is parametrized into six malformed-input variants, plus one
-meta-test over the whole package. Full suite exit status was 0.
+meta-test over the whole package. Full suite exit status was 0. The rest of the
+suite covers the modules one at a time and the full chain through `core.run`
+and the CLI.
 
 Every adversarial test drives the layers together, not one module at a time:
 `parse_action(raw)` → `tools.execute(action, store)` → `AuditLog.record(...)`
@@ -59,14 +61,17 @@ fuzzing campaign, or penetration test has been performed.
 
 Further, specifically:
 
-- **The chain is test-only.** Production `cli.py` still calls only the mock
-  provider and prints its fixed reply. It does not call `parse_action`,
-  `tools.execute`, or `AuditLog.record` yet, so the *integration* verified here
-  is a test harness, not a shipped path.
-- **No real model has been attacked.** The mock provider ignores input, so
-  prompt-injection behaviour against an actual model (Ollama, later) is
-  unevaluated. The tests prove the *capability* cannot widen, not that summary
-  quality survives injection.
+- **The shipped path now runs the full chain, but with a mock model.**
+  `cli.py` calls `core.run`, which validates the question, creates the grant,
+  builds the prompt, asks the provider through the `Provider` interface, calls
+  `parse_action`, rejects a grant-id mismatch, runs `tools.execute`, and audits
+  every step; what the user sees is the tool's real summary. The provider
+  behind it is `MockActionProvider`, which returns a fixed action JSON without
+  reading the prompt, so the chain is exercised end to end but no model is.
+- **Nothing has been measured against a real model.** No real model has been
+  attacked: prompt-injection behaviour against an actual model (Ollama, later)
+  is unevaluated, and summary quality is unmeasured. The tests prove the
+  *capability* cannot widen, not that a model's output stays useful or honest.
 - **Process isolation is absent.** There is no seccomp, container, or OS
   sandbox; containment rests on Python code plus ordinary user permissions.
   The import meta-test is static (AST) evidence about today's source, not a
@@ -81,7 +86,8 @@ Further, specifically:
 - **The audit log is not tamper-evident.** It is append-only by convention, with
   no signing, no hash chain, no rotation, and no off-machine shipping. A local
   attacker can edit or delete it, and a failed write is only counted in
-  `failures` — nothing surfaces that counter to the user yet.
+  `failures`, which the CLI reduces to one warning line at exit — a warning
+  the user can miss or ignore, and no record of the loss survives.
 - **The audit trail is metadata only, by design.** That protects content but
   also limits after-the-fact investigation: the log cannot reconstruct what was
   refused beyond a fixed outcome string.

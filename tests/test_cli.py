@@ -3,13 +3,17 @@ import pytest
 from kayt import cli
 
 
-def test_typed_question_reports_typed_text(capsys):
-    cli.main(["what is this?"])
-    assert capsys.readouterr().out.splitlines() == [
-        "Input: typed text",
-        "Provider: mock",
-        "mock response",
-    ]
+def test_omitting_the_file_option_fails_closed(capsys):
+    """No file means no grant, so there is nothing safe to read."""
+    with pytest.raises(SystemExit) as err:
+        cli.main(["what is this?"])
+
+    assert err.value.code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.count("\n") == 1
+    assert captured.err.startswith("error: ")
+    assert "--file" in captured.err
 
 
 def test_file_option_reports_filename(tmp_path, capsys):
@@ -17,9 +21,10 @@ def test_file_option_reports_filename(tmp_path, capsys):
     path.write_text("some notes", encoding="utf-8")
     cli.main(["summarise this", "--file", str(path)])
     assert capsys.readouterr().out.splitlines() == [
-        f"Input: file {path}",
+        f"File: notes.txt ({path.stat().st_size} bytes)",
         "Provider: mock",
-        "mock response",
+        "KAYT reads only this file. No content leaves this computer.",
+        "Summary: some notes",
     ]
 
 

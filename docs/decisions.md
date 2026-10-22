@@ -27,3 +27,6 @@ multi-agent, custom kernel/updater/package manager.
 - Grant expiry: grants are session-only and expire when clear() ends the session; there are no timestamps or TTLs, and a cleared id is never reused.
 - Audit log: JSON Lines, one line per event, metadata only -- timestamp, event, allowed, outcome, tool, grant_id -- with every field capped at 100 characters; the path is caller-chosen, never inside the source tree.
 - Audit writes are best-effort: a failed write is counted in AuditLog.failures and never raised to the caller; clear() deletes the file, and *.jsonl plus audit/ are gitignored.
+
+## 2026-10-22
+- Typed-only mode is dropped (Option A): every run needs a user-selected file. A grant is the only way text becomes readable, and typed input has no grant, no size or type check, and no audit line, so `kayt "question"` without `--file` now fails closed with one error line.
