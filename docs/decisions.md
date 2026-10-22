@@ -32,3 +32,6 @@ multi-agent, custom kernel/updater/package manager.
 - Typed-only mode is dropped (Option A): every run needs a user-selected file. A grant is the only way text becomes readable, and typed input has no grant, no size or type check, and no audit line, so `kayt "question"` without `--file` now fails closed with one error line.
 - Session = one CLI process; grants are cleared explicitly at the end of every run. Remote-provider data disclosure is deferred until a remote provider exists.
 - The grant store is cleared in `core.run`'s `finally: store.clear()`, so success, denial, provider failure, parse failure and every other return path end the session before the result reaches the caller.
+- Console script deferred to Goal 6: the documented entry point is `python -m kayt.cli`, and `pyproject.toml` defines no `[project.scripts]` yet.
+- Permission-denied (OS-level unreadable file) is still untested on Windows, as recorded in Known gaps above; the branch exists in grants.py but no test exercises it.
+- `clear()` is unaudited: ending the session writes no audit event, so a failed or skipped clear would leave no trace in the log.
