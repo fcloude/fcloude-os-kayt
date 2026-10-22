@@ -10,7 +10,9 @@
 6. compare the action's grant id with the grant actually created, rejecting
    any mismatch as a denial (never substituting the real id),
 7. run the action through the tool gateway,
-8. audit every step with a fixed event name.
+8. audit every step with a fixed event name,
+9. clear the grant store, so this session's grants are dead once ``run``
+   returns.
 
 Every failure is a value: a ``RunResult`` with ``ok=False`` and one short,
 fixed-string error. A failure never falls through to a different action, never
@@ -138,12 +140,39 @@ def run(
     *,
     announce: Callable[[Grant], None] | None = None,
 ) -> RunResult:
-    """Run one full loop and return its result. Never raises.
+    """Run one full loop, then end the session. Never raises.
+
+    The store is cleared in a ``finally``, so the grant created for this
+    question is dead the moment ``run`` returns -- after success, a denial, a
+    provider failure, a parse failure, or any other early return.
 
     ``announce`` is an optional display hook called once, after the grant
     exists and before the provider is asked, so the caller can show what will
     be read without printing anything when grant creation fails.
     """
+    try:
+        return _run_once(
+            question,
+            file_path,
+            provider,
+            store,
+            audit,
+            announce=announce,
+        )
+    finally:
+        store.clear()
+
+
+def _run_once(
+    question: str,
+    file_path: str,
+    provider: object,
+    store: GrantStore,
+    audit: object,
+    *,
+    announce: Callable[[Grant], None] | None = None,
+) -> RunResult:
+    """The ordered steps of one run; ``run`` owns when the session ends."""
     name = getattr(provider, "name", type(provider).__name__)
 
     try:

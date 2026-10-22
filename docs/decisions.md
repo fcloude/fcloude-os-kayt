@@ -30,3 +30,4 @@ multi-agent, custom kernel/updater/package manager.
 
 ## 2026-10-22
 - Typed-only mode is dropped (Option A): every run needs a user-selected file. A grant is the only way text becomes readable, and typed input has no grant, no size or type check, and no audit line, so `kayt "question"` without `--file` now fails closed with one error line.
+- Session = one CLI process; grants are cleared explicitly at the end of every run. Remote-provider data disclosure is deferred until a remote provider exists.

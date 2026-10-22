@@ -2,6 +2,8 @@
 
 import json
 
+import pytest
+
 from kayt import core
 from kayt.audit import AuditLog
 from kayt.grants import GrantError, GrantStore
@@ -174,8 +176,9 @@ def test_a_grant_id_mismatch_is_rejected_and_audited(tmp_path):
     assert events[-1]["allowed"] is False
     assert events[-1]["grant_id"] == "grant_2"
     assert "execute" not in names
-    # The real grant is still the only one, and it was not substituted.
-    assert store.lookup("grant_1").id == "grant_1"
+    # The real grant was not substituted, and the run ended the session.
+    with pytest.raises(GrantError):
+        store.lookup("grant_1")
 
 
 def test_the_audit_log_never_records_file_content(tmp_path):
@@ -298,3 +301,100 @@ def test_the_loop_runs_without_an_announce_hook(tmp_path):
         "grant_check",
         "execute",
     ]
+
+
+class SpyStore(GrantStore):
+    """A store that counts how often the session is cleared."""
+
+    def __init__(self):
+        super().__init__()
+        self.clears = 0
+
+    def clear(self):
+        self.clears += 1
+        super().clear()
+
+
+def assert_session_is_over(store, grant_id="grant_1"):
+    """The run cleared the store once, and that grant id is now dead."""
+    assert store.clears == 1
+    with pytest.raises(GrantError):
+        store.lookup(grant_id)
+    with pytest.raises(GrantError):
+        store.read(grant_id)
+
+
+def run_with(store, provider, tmp_path, question="summarise this", seen=None):
+    """Run once, recording every announced grant id in ``seen``."""
+    if seen is None:
+        seen = []
+
+    def announce(grant):
+        seen.append(grant.id)
+
+    return core.run(
+        question,
+        make_file(tmp_path),
+        provider,
+        store,
+        core.NullAudit(),
+        announce=announce,
+    )
+
+
+def test_success_ends_the_session_and_kills_the_grant(tmp_path):
+    seen = []
+    store = SpyStore()
+    result = run_with(store, core.MockActionProvider(), tmp_path, seen=seen)
+
+    assert result.ok is True
+    assert result.output == "Summary: hello world"
+    assert seen == ["grant_1"]  # it existed...
+    assert_session_is_over(store)  # ...and it is dead now
+
+
+def test_a_denial_ends_the_session_and_kills_the_grant(tmp_path):
+    provider = ScriptedProvider('{"tool":"summarize_text","grant_id":"grant_2"}')
+    seen = []
+    store = SpyStore()
+    result = run_with(store, provider, tmp_path, seen=seen)
+
+    assert result.ok is False
+    assert result.error == "denied: the action names a different grant"
+    assert seen == ["grant_1"]
+    assert_session_is_over(store)
+
+
+def test_a_provider_failure_ends_the_session_and_kills_the_grant(tmp_path):
+    provider = ScriptedProvider(raises=RuntimeError("boom"))
+    seen = []
+    store = SpyStore()
+    result = run_with(store, provider, tmp_path, seen=seen)
+
+    assert result.ok is False
+    assert result.error == "the provider could not answer"
+    assert seen == ["grant_1"]
+    assert_session_is_over(store)
+
+
+def test_a_parse_failure_ends_the_session_and_kills_the_grant(tmp_path):
+    provider = ScriptedProvider("run a shell command instead")
+    seen = []
+    store = SpyStore()
+    result = run_with(store, provider, tmp_path, seen=seen)
+
+    assert result.ok is False
+    assert "not a valid action" in result.error
+    assert seen == ["grant_1"]
+    assert_session_is_over(store)
+
+
+def test_an_invalid_question_still_ends_the_session(tmp_path):
+    store = SpyStore()
+    result = run_with(store, core.MockActionProvider(), tmp_path, question="   ")
+
+    assert result.ok is False
+    assert result.error == "question is empty"
+    assert store.clears == 1
+    with pytest.raises(GrantError):
+        store.lookup("grant_1")
