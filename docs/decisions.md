@@ -35,3 +35,4 @@ multi-agent, custom kernel/updater/package manager.
 - Console script deferred to Goal 6: the documented entry point is `python -m kayt.cli`, and `pyproject.toml` defines no `[project.scripts]` yet.
 - Permission-denied (OS-level unreadable file) is still untested on Windows, as recorded in Known gaps above; the branch exists in grants.py but no test exercises it.
 - `clear()` is unaudited: ending the session writes no audit event, so a failed or skipped clear would leave no trace in the log.
+- Linux-only and permission-denied tests deferred to a WSL run in Goal 6.

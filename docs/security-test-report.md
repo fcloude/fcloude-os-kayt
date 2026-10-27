@@ -1,13 +1,14 @@
 # KAYT security test report
 
-Status: adversarial test suite plus the shipped loop. Run 2026-10-22 on
-Windows 11 (10.0.26300), Python 3.13.14, standard library only.
+Status: adversarial test suite, the shipped loop, and the subprocess CLI.
+Last updated 2026-10-22 on Windows 11 (10.0.26300), Python 3.13.14, standard
+library only.
 
 ## What was run
 
 ```
 pytest -q -rs
-133 passed, 0 skipped
+144 passed, 0 skipped
 ```
 
 `tests/test_adversarial.py` contributes **19 test cases**: 13 named attacks,
@@ -15,6 +16,17 @@ one of which is parametrized into six malformed-input variants, plus one
 meta-test over the whole package. Full suite exit status was 0. The rest of the
 suite covers the modules one at a time and the full chain through `core.run`
 and the CLI.
+
+`tests/test_cli_process.py` contributes **6 test cases** that leave the process:
+each runs `sys.executable -m kayt.cli` through `subprocess.run` with `cwd` set
+to a temporary directory and `PYTHONPATH` pointed at `src/`, so the tests need
+no install of the package and run from a clean checkout with only pytest
+available. Five drive the real CLI: a valid `.txt` (exit 0, header with byte
+size, provider line, privacy line, summary, empty stderr), a 102,401-byte file,
+an unsupported `.pdf`, a missing path, and no `--file` argument. Each failing
+case asserts exit 1, empty stdout, exactly one `error:` line, and no traceback.
+The sixth pins the boundary of the adversarial guard: that meta-test scans
+`src/kayt/` only, while `tests/` may import `subprocess`.
 
 Every adversarial test drives the layers together, not one module at a time:
 `parse_action(raw)` → `tools.execute(action, store)` → `AuditLog.record(...)`
